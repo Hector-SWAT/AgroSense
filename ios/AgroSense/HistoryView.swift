@@ -10,12 +10,22 @@ struct HistoryView: View {
     @State private var from = Calendar.current.date(byAdding: .month, value: -3, to: .now)!
     @State private var to = Date()
 
-    var body: some View {
-        let list = apps.filter { a in
-            (q.isEmpty || [a.clientName, a.plotName, a.crop, a.productName, a.target, a.operatorName].joined(separator: " ").localizedCaseInsensitiveContains(q)) &&
-            (cat.isEmpty || a.category == cat) &&
-            (!useRange || (a.date >= Calendar.current.startOfDay(for: from) && a.date < Calendar.current.startOfDay(for: to).addingTimeInterval(86_400)))
+    private func matches(_ a: ApplicationRecord) -> Bool {
+        if !q.isEmpty {
+            let text = [a.clientName, a.plotName, a.crop, a.productName, a.target, a.operatorName].joined(separator: " ")
+            if !text.localizedCaseInsensitiveContains(q) { return false }
         }
+        if !cat.isEmpty && a.category != cat { return false }
+        if useRange {
+            let start = Calendar.current.startOfDay(for: from)
+            let end = Calendar.current.startOfDay(for: to).addingTimeInterval(86_400)
+            if a.date < start || a.date >= end { return false }
+        }
+        return true
+    }
+
+    var body: some View {
+        let list = apps.filter(matches)
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Filtrar por fechas", isOn: $useRange)
@@ -29,8 +39,8 @@ struct HistoryView: View {
                 }.pickerStyle(.menu)
                 HStack(spacing: 8) {
                     StatCard(label: "Registros", value: "\(list.count)", emoji: "🧾")
-                    StatCard(label: "Hectáreas", value: Calculator.fmt(list.reduce(0) { $0 + $1.areaHa }), emoji: "🌾")
-                    StatCard(label: "Costo", value: money(list.reduce(0) { $0 + ($1.cost ?? 0) }), emoji: "💲")
+                    StatCard(label: "Hectáreas", value: Calculator.fmt(list.reduce(0.0) { $0 + $1.areaHa }), emoji: "🌾")
+                    StatCard(label: "Costo", value: money(list.reduce(0.0) { $0 + ($1.cost ?? 0) }), emoji: "💲")
                 }
                 if list.isEmpty { HelpBox(text: "No hay aplicaciones con estos filtros.") }
                 ForEach(list) { a in

@@ -8,31 +8,22 @@ struct ClientsView: View {
     @State private var q = ""
     @State private var showNew = false
 
+    private var filtered: [Client] {
+        if q.isEmpty { return clients }
+        return clients.filter { ($0.name + " " + $0.location).localizedCaseInsensitiveContains(q) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Cada cliente tiene sus parcelas y el historial de lo aplicado.").foregroundStyle(Color.agMuted)
                 RgbButton(title: "Agregar cliente", systemImage: "plus", colors: Rgb.blue) { showNew = true }
-                let list = clients.filter { q.isEmpty || ($0.name + " " + $0.location).localizedCaseInsensitiveContains(q) }
-                if list.isEmpty { HelpBox(text: clients.isEmpty ? "Aún no tienes clientes. Toca \"Agregar cliente\" para registrar al primero." : "Sin resultados.") }
-                ForEach(list) { c in
-                    let cp = plots.filter { $0.clientId == c.id }
-                    NavigationLink { ClientDetailView(client: c) } label: {
-                        SectionCard {
-                            HStack(spacing: 12) {
-                                Text(String(c.name.prefix(1)).uppercased()).font(.title2.bold()).foregroundStyle(.white)
-                                    .frame(width: 46, height: 46).background(LinearGradient(colors: Rgb.teal, startPoint: .top, endPoint: .bottom)).clipShape(Circle())
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(c.name).font(.headline)
-                                    Text([c.location, c.phone].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(Color.agMuted)
-                                    Text("\(cp.count) parcelas · \(apps.filter { $0.clientId == c.id }.count) aplicaciones · \(Calculator.fmt(cp.reduce(0) { $0 + $1.areaHa })) ha")
-                                        .font(.caption).foregroundStyle(Color.agGreen)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right").foregroundStyle(Color.agMuted)
-                            }
-                        }
-                    }.buttonStyle(.plain)
+                if filtered.isEmpty {
+                    HelpBox(text: clients.isEmpty ? "Aún no tienes clientes. Toca \"Agregar cliente\" para registrar al primero." : "Sin resultados.")
+                }
+                ForEach(filtered) { c in
+                    NavigationLink { ClientDetailView(client: c) } label: { ClientRow(client: c, plots: plots, apps: apps) }
+                        .buttonStyle(.plain)
                 }
             }.padding(16)
         }
@@ -43,12 +34,46 @@ struct ClientsView: View {
     }
 }
 
+struct ClientRow: View {
+    let client: Client
+    let plots: [Plot]
+    let apps: [ApplicationRecord]
+
+    private var myPlots: [Plot] { plots.filter { $0.clientId == client.id } }
+    private var appCount: Int { apps.filter { $0.clientId == client.id }.count }
+    private var area: Double { myPlots.reduce(0.0) { $0 + $1.areaHa } }
+    private var contact: String { [client.location, client.phone].filter { !$0.isEmpty }.joined(separator: " · ") }
+    private var initial: String { String(client.name.prefix(1)).uppercased() }
+
+    var body: some View {
+        SectionCard {
+            HStack(spacing: 12) {
+                Text(initial).font(.title2.bold()).foregroundStyle(.white)
+                    .frame(width: 46, height: 46)
+                    .background(LinearGradient(colors: Rgb.teal, startPoint: .top, endPoint: .bottom))
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(client.name).font(.headline)
+                    Text(contact).font(.caption).foregroundStyle(Color.agMuted)
+                    Text("\(myPlots.count) parcelas · \(appCount) aplicaciones · \(Calculator.fmt(area)) ha")
+                        .font(.caption).foregroundStyle(Color.agGreen)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(Color.agMuted)
+            }
+        }
+    }
+}
+
 struct ClientForm: View {
     let client: Client?
     var onSaved: (Int64) -> Void
     @Environment(\.modelContext) private var ctx
     @Environment(\.dismiss) private var dismiss
-    @State private var name = "", phone = "", location = "", notes = ""
+    @State private var name = ""
+    @State private var phone = ""
+    @State private var location = ""
+    @State private var notes = ""
 
     var body: some View {
         NavigationStack {
@@ -87,9 +112,14 @@ struct PlotForm: View {
     var onSaved: (Int64) -> Void
     @Environment(\.modelContext) private var ctx
     @Environment(\.dismiss) private var dismiss
-    @State private var name = "", crop = Catalog.crops[0].name, variety = "", area = ""
-    @State private var hasStart = false, hasEnd = false
-    @State private var start = Date(), end = Date().addingTimeInterval(120 * 86_400)
+    @State private var name = ""
+    @State private var crop = Catalog.crops[0].name
+    @State private var variety = ""
+    @State private var area = ""
+    @State private var hasStart = false
+    @State private var hasEnd = false
+    @State private var start = Date()
+    @State private var end = Date().addingTimeInterval(120 * 86_400)
 
     var body: some View {
         NavigationStack {
@@ -147,26 +177,34 @@ struct ClientDetailView: View {
     @State private var newPlot = false
     @State private var confirmDelete = false
 
+    private var plots: [Plot] { allPlots.filter { $0.clientId == client.id } }
+    private var apps: [ApplicationRecord] { allApps.filter { $0.clientId == client.id } }
+    private var looseApps: [ApplicationRecord] {
+        let ids = Set(plots.map { $0.id })
+        return apps.filter { a in a.plotId.map { !ids.contains($0) } ?? true }
+    }
+    private var totalCost: Double { apps.reduce(0.0) { $0 + ($1.cost ?? 0) } }
+    private var contact: String { [client.location, client.phone].filter { !$0.isEmpty }.joined(separator: " · ") }
+
     var body: some View {
-        let plots = allPlots.filter { $0.clientId == client.id }
-        let apps = allApps.filter { $0.clientId == client.id }
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text([client.location, client.phone].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(Color.agMuted)
+                Text(contact).foregroundStyle(Color.agMuted)
                 HStack(spacing: 10) {
                     StatCard(label: "Aplicaciones", value: "\(apps.count)", emoji: "🧪")
-                    StatCard(label: "Costo total", value: money(apps.reduce(0) { $0 + ($1.cost ?? 0) }), emoji: "💲")
+                    StatCard(label: "Costo total", value: money(totalCost), emoji: "💲")
                 }
                 RgbButton(title: "Agregar parcela", systemImage: "plus", colors: Rgb.teal) { newPlot = true }
-                if plots.isEmpty { HelpBox(text: "Agrega las parcelas del cliente (nombre, cultivo y superficie). Así cada aplicación queda ligada a su ciclo de cultivo.") }
-                ForEach(plots) { p in
-                    PlotCard(plot: p, apps: apps.filter { $0.plotId == p.id },
-                             onApply: { router.newApplication(client: client.id, plot: p.id) },
-                             onEdit: { editingPlot = p })
+                if plots.isEmpty {
+                    HelpBox(text: "Agrega las parcelas del cliente (nombre, cultivo y superficie). Así cada aplicación queda ligada a su ciclo de cultivo.")
                 }
-                let loose = apps.filter { a in !plots.contains { $0.id == a.plotId } }
-                if !loose.isEmpty { SectionCard(title: "Aplicaciones sin parcela", emoji: "📄") { TimelineList(apps: loose) } }
-                RgbButton(title: "Nueva aplicación para \(client.name)", systemImage: "drop.fill", colors: Rgb.green) { router.newApplication(client: client.id) }
+                plotList
+                if !looseApps.isEmpty {
+                    SectionCard(title: "Aplicaciones sin parcela", emoji: "📄") { TimelineList(apps: looseApps) }
+                }
+                RgbButton(title: "Nueva aplicación para \(client.name)", systemImage: "drop.fill", colors: Rgb.green) {
+                    router.newApplication(client: client.id)
+                }
             }.padding(16)
         }
         .background(Color.agBg)
@@ -179,12 +217,24 @@ struct ClientDetailView: View {
         .sheet(isPresented: $newPlot) { PlotForm(clientId: client.id, plot: nil) { _ in } }
         .sheet(item: $editingPlot) { p in PlotForm(clientId: client.id, plot: p) { _ in } }
         .alert("¿Eliminar cliente?", isPresented: $confirmDelete) {
-            Button("Eliminar", role: .destructive) {
-                for p in allPlots where p.clientId == client.id { ctx.delete(p) }
-                ctx.delete(client); try? ctx.save(); dismiss()
-            }
+            Button("Eliminar", role: .destructive) { deleteClient() }
             Button("Cancelar", role: .cancel) {}
         } message: { Text("Se borrarán el cliente y sus parcelas. Las aplicaciones registradas se conservan en el historial.") }
+    }
+
+    private var plotList: some View {
+        ForEach(plots) { p in
+            PlotCard(plot: p, apps: apps.filter { $0.plotId == p.id },
+                     onApply: { router.newApplication(client: client.id, plot: p.id) },
+                     onEdit: { editingPlot = p })
+        }
+    }
+
+    private func deleteClient() {
+        for p in allPlots where p.clientId == client.id { ctx.delete(p) }
+        ctx.delete(client)
+        try? ctx.save()
+        dismiss()
     }
 }
 
@@ -194,15 +244,23 @@ struct PlotCard: View {
     let onApply: () -> Void
     let onEdit: () -> Void
 
+    private var inCycle: [ApplicationRecord] {
+        apps.filter { a in
+            if let s = plot.cycleStart, a.date < s { return false }
+            if let e = plot.cycleEnd, a.date > e.addingTimeInterval(86_400) { return false }
+            return true
+        }
+    }
+    private var harvest: Date? { apps.compactMap { $0.harvestAllowedAt }.max() }
+    private var cycleCost: Double { inCycle.reduce(0.0) { $0 + ($1.cost ?? 0) } }
+
     var body: some View {
-        let inCycle = apps.filter { a in (plot.cycleStart.map { a.date >= $0 } ?? true) && (plot.cycleEnd.map { a.date <= $0.addingTimeInterval(86_400) } ?? true) }
-        let harvest = apps.compactMap(\.harvestAllowedAt).max()
         SectionCard(title: "\(plot.name) · \(Calculator.fmt(plot.areaHa)) ha", emoji: Catalog.crop(plot.crop)?.emoji ?? "🌱") {
             Text(plot.crop + (plot.variety.isEmpty ? "" : " · \(plot.variety)")).foregroundStyle(Color.agMuted)
             if plot.cycleStart != nil || plot.cycleEnd != nil {
                 Text("Ciclo: \(plot.cycleStart.map { dateFmt.string(from: $0) } ?? "?") → \(plot.cycleEnd.map { dateFmt.string(from: $0) } ?? "?")").font(.footnote)
             }
-            Text("Aplicaciones en el ciclo: \(inCycle.count) · Costo: \(money(inCycle.reduce(0) { $0 + ($1.cost ?? 0) }))").font(.footnote).foregroundStyle(Color.agGreen)
+            Text("Aplicaciones en el ciclo: \(inCycle.count) · Costo: \(money(cycleCost))").font(.footnote).foregroundStyle(Color.agGreen)
             if let harvest {
                 Text(harvest <= Date() ? "🧺 Cosecha permitida (intervalo de seguridad cumplido)" : "⏳ Cosechar a partir de \(dateFmt.string(from: harvest))")
                     .font(.footnote.weight(.semibold)).foregroundStyle(harvest <= Date() ? Color.agGreen : Color.agWarn)

@@ -24,14 +24,21 @@ struct WizardView: View {
     @State private var areaText = ""
     @State private var areaUnit = "m²"
     @State private var equipKey = ""
-    @State private var waterText = "", tankText = "", flowText = "", refillText = ""
+    @State private var waterText = ""
+    @State private var tankText = ""
+    @State private var flowText = ""
+    @State private var refillText = ""
     @State private var showAdvanced = false
     @State private var doseText = ""
     @State private var priceText = ""
     @State private var appDate = Date()
-    @State private var operatorName = "", weather = "", notes = ""
+    @State private var operatorName = ""
+    @State private var weather = ""
+    @State private var notes = ""
     @State private var ppeChecked: Set<String> = []
-    @State private var showNewClient = false, showNewPlot = false, showNewProduct = false
+    @State private var showNewClient = false
+    @State private var showNewPlot = false
+    @State private var showNewProduct = false
     @State private var saved = false
 
     private var client: Client? { clients.first { $0.id == clientId } }

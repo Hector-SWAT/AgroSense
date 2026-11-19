@@ -7,6 +7,13 @@ struct HomeView: View {
     @Query(sort: \ApplicationRecord.date, order: .reverse) private var apps: [ApplicationRecord]
     @Query private var products: [Product]
 
+    private var totalArea: Double { apps.reduce(0.0) { $0 + $1.areaHa } }
+    private var totalCost: Double { apps.reduce(0.0) { $0 + ($1.cost ?? 0) } }
+    private var activeAlerts: [ApplicationRecord] {
+        let now = Date()
+        return Array(apps.filter { ($0.reentryAt ?? .distantPast) > now || ($0.harvestAllowedAt ?? .distantPast) > now }.prefix(6))
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
@@ -34,15 +41,15 @@ struct HomeView: View {
                 }.buttonStyle(.plain)
 
                 HStack(spacing: 10) {
-                    StatCard(label: "Superficie", value: Calculator.fmt(apps.reduce(0) { $0 + $1.areaHa }) + " ha", emoji: "🌾")
-                    StatCard(label: "Costo", value: money(apps.reduce(0) { $0 + ($1.cost ?? 0) }), emoji: "💲")
+                    StatCard(label: "Superficie", value: Calculator.fmt(totalArea) + " ha", emoji: "🌾")
+                    StatCard(label: "Costo", value: money(totalCost), emoji: "💲")
                 }
 
                 let now = Date()
-                let active = apps.filter { ($0.reentryAt ?? .distantPast) > now || ($0.harvestAllowedAt ?? .distantPast) > now }.prefix(6)
+                let active = activeAlerts
                 SectionCard(title: "Avisos activos", emoji: "⏳") {
                     if active.isEmpty { Text("No hay parcelas en periodo de reentrada ni de seguridad.").foregroundStyle(Color.agMuted) }
-                    ForEach(Array(active)) { a in
+                    ForEach(active) { a in
                         NavigationLink { ApplicationDetailView(app: a) } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(Catalog.crop(a.crop)?.emoji ?? "🌱") \(a.plotName.isEmpty ? a.crop.short : a.plotName) · \(a.clientName.isEmpty ? "Sin cliente" : a.clientName)").fontWeight(.semibold)

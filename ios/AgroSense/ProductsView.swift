@@ -62,9 +62,24 @@ struct ProductForm: View {
     var onSaved: (Int64) -> Void
     @Environment(\.modelContext) private var ctx
     @Environment(\.dismiss) private var dismiss
-    @State private var name = "", category = "insecticida", active = "", formulation = "", registration = ""
-    @State private var crop = "", target = "", doseMin = "", doseMax = "", unit = "L/ha", method = "", tox = ""
-    @State private var phi = "", rei = "", maxApps = "", interval = "", price = "", priceUnit = "L"
+    @State private var name = ""
+    @State private var category = "insecticida"
+    @State private var active = ""
+    @State private var formulation = ""
+    @State private var registration = ""
+    @State private var crop = ""
+    @State private var target = ""
+    @State private var doseMin = ""
+    @State private var doseMax = ""
+    @State private var unit = "L/ha"
+    @State private var method = ""
+    @State private var tox = ""
+    @State private var phi = ""
+    @State private var rei = ""
+    @State private var maxApps = ""
+    @State private var interval = ""
+    @State private var price = ""
+    @State private var priceUnit = "L"
     @State private var confirmDelete = false
 
     private func d(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: ".")) }
