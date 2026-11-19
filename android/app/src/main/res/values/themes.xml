@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.AgroSense" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#145B3B</item>
+        <item name="android:navigationBarColor">#F4F7F5</item>
+        <item name="android:windowBackground">#F4F7F5</item>
+    </style>
+    <style name="Theme.AgroSense.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#145B3B</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.AgroSense</item>
+    </style>
+</resources>
